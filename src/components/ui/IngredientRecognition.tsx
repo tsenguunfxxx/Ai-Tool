@@ -1,47 +1,50 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { InferenceClient } from "@huggingface/inference";
-import { FileText, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { useState } from "react";
+import MarkdownBody from "@/components/ui/MarkdownBody";
+import { Button } from "@/components/ui/button";
+import { FileText, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { getGemini } from "@/lib/gemini";
 
-const client = new InferenceClient(process.env.NEXT_PUBLIC_HF_TOKEN);
-
-const Create = () => {
-  const [imageUrl, setImageUrl] = useState("");
+const IngredientRecognition = () => {
   const [text, setText] = useState("");
+  const [response, setResponse] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
   const reset = () => {
     setText("");
-    setImageUrl("");
-    setError("");
+    setResponse("");
   };
 
-  const generateImage = async () => {
+  const handleGenerate = async () => {
     if (!text.trim()) return;
 
     setLoading(true);
-    setImageUrl("");
-    setError("");
+    setResponse("");
 
     try {
-      const dataUrl = await client.textToImage(
-        {
-          provider: "fal-ai",
-          model: "black-forest-labs/FLUX.1-dev",
-          inputs: text,
-        },
-        {
-          outputType: "dataUrl",
-        },
-      );
+      const result = await getGemini().models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            text: `Read the food description below and list the ingredients needed for it.
 
-      setImageUrl(dataUrl);
-    } catch (err) {
-      console.log(err);
-      setError("Алдаа гарлаа. HuggingFace token шалга.");
+Return the result in Markdown: a short summary sentence, then a bullet list of ingredients.
+
+Description:
+${text}`,
+          },
+        ],
+      });
+
+      setResponse(result.text ?? "");
+    } catch (error) {
+      console.log(error);
+      setResponse(
+        error instanceof Error
+          ? error.message
+          : "Алдаа гарлаа. API key эсвэл model name шалга.",
+      );
     } finally {
       setLoading(false);
     }
@@ -53,7 +56,7 @@ const Create = () => {
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-2xl font-bold">
             <Sparkles className="h-6 w-6" />
-            Food image creator
+            Ingredient recognition
           </h2>
 
           <Button
@@ -67,19 +70,19 @@ const Create = () => {
         </div>
 
         <p className="text-sm text-muted-foreground">
-          What food image do you want? Describe it briefly.
+          Describe the food, and AI will detect the ingredients.
         </p>
 
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Describe the food"
+          placeholder="Type / paste a recipe"
           className="h-[120px] w-full resize-none rounded-md border px-4 py-3 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring"
         />
 
         <div className="flex justify-end">
           <Button
-            onClick={generateImage}
+            onClick={handleGenerate}
             disabled={loading || !text.trim()}
             className="h-12 w-[110px]"
           >
@@ -95,23 +98,19 @@ const Create = () => {
       <section className="mt-10">
         <h2 className="flex items-center gap-2 text-2xl font-bold">
           <FileText className="h-6 w-6" />
-          Result
+          Identified ingredients
         </h2>
 
         <div className="mt-3 text-sm text-muted-foreground">
           {loading ? (
             <p className="flex items-center gap-2">
-              Working on your image, just wait for a moment
+              Working on your text, just wait for a moment
               <Loader2 className="h-4 w-4 animate-spin" />
             </p>
-          ) : imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={text}
-              className="w-[320px] rounded-lg border"
-            />
+          ) : response ? (
+            <div className="text-foreground"><MarkdownBody>{response}</MarkdownBody></div>
           ) : (
-            <p>{error || "First, enter your text to generate an image."}</p>
+            <p>First, enter your text to recognize an ingredients.</p>
           )}
         </div>
       </section>
@@ -119,4 +118,4 @@ const Create = () => {
   );
 };
 
-export default Create;
+export default IngredientRecognition;
